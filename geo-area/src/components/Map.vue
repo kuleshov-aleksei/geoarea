@@ -1,9 +1,17 @@
 <template>
   <div id="wrapper">
     <div id="chartdiv"></div>
-    <div v-if="longSelectedName != null && longSelectedName.length > 0" id="analyze-area">
-      <h1>Selected area: {{ longSelectedName }} ({{ shortSelectedId }})</h1>
-      <el-button type="primary" @click="startAnalysis">Запустить расчет площади</el-button>
+    <div id="controls">
+      <el-button type="primary" @click="foundBoundingBox">Найти bounding-box</el-button>
+    </div>
+    <div id="selected-area">
+      <h1>Выбранная область: {{ longSelectedName }} ({{ shortSelectedId }})</h1>
+    </div>
+    <div id="debug-info">
+      <div v-if="boundingbox_minX != 0">
+        Границы: [{{ boundingbox_minX }} ; {{ boundingbox_minY }}] [{{ boundingbox_maxX }} ; {{ boundingbox_maxY }}] 
+        <div id="selected-area"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -20,24 +28,26 @@ export default {
     return {
       shortSelectedId: "",
       longSelectedName: "",
-      selectedArea: null,
-      geometryType: "",
-      boundingbox_minX: Number.MAX_SAFE_INTEGER,
-      boundingbox_minY: Number.MAX_SAFE_INTEGER,
-      boundingbox_maxX: Number.MIN_SAFE_INTEGER,
-      boundingbox_maxY: Number.MIN_SAFE_INTEGER,
-      boundingPolygon: null,
+      //selectedArea: null,
+      //geometryType: "",
+      boundingbox_minX: 0,
+      boundingbox_minY: 0,
+      boundingbox_maxX: 0,
+      boundingbox_maxY: 0,
+      //boundingPolygon: null,
     };
   },
   methods: {
     handleAreaChanged: function (dataContext) {
-      console.log(dataContext);
+      //console.log(dataContext);
       this.shortSelectedId = dataContext.id;
       this.longSelectedName = dataContext.name;
       this.selectedArea = dataContext.geometry.coordinates;
       this.geometryType = dataContext.geometryType;
+      
+      this.drawSelectedArea(this.shortSelectedId);
     },
-    startAnalysis: function () {
+    foundBoundingBox: function () {
       this.resetState();
       //console.log(this.selectedArea);
       if (this.geometryType === "Polygon") {
@@ -61,7 +71,7 @@ export default {
         return;
       }
 
-      console.log("Min X: " + this.boundingbox_minX + " Min Y: " + this.boundingbox_minY + " Max X: " + this.boundingbox_maxX + " Max Y:" + this.boundingbox_maxY);
+      //console.log("Min X: " + this.boundingbox_minX + " Min Y: " + this.boundingbox_minY + " Max X: " + this.boundingbox_maxX + " Max Y:" + this.boundingbox_maxY);
 
       this.boundingPolygon.data.clear();
       this.boundingPolygon.data.push({
@@ -78,6 +88,8 @@ export default {
           ]
         }
       });
+
+      this.drawSelectedArea(this.shortSelectedId);
     },
     findMinMaxMultiPolygon: function (area) {
       var minX = Number.MAX_SAFE_INTEGER;
@@ -140,6 +152,37 @@ export default {
       this.boundingbox_minY = Number.MAX_SAFE_INTEGER;
       this.boundingbox_maxX = Number.MIN_SAFE_INTEGER;
       this.boundingbox_maxY = Number.MIN_SAFE_INTEGER;
+    },
+    drawSelectedArea: function(region) {
+      //this.selectedAreaChart.series.clear();
+      if (this.selectedPolygonSeries != null) {
+        this.selectedAreaChart.series.removeIndex(this.selectedAreaChart.series.indexOf(this.selectedPolygonSeries));
+        //this.selectedAreaChart.series.removeIndex(this.selectedAreaChart.series.indexOf(this.boundingPolygon));
+        this.selectedPolygonSeries.dispose();
+      }
+      this.selectedPolygonSeries = this.selectedAreaChart.series.push(
+        am5map.MapPolygonSeries.new(this.selectedAreaRoot, {
+          geoJSON: am5geodata_worldLow,
+          include: [region],
+        })
+      );
+
+      if (this.boundingPolygon == null) {
+        this.boundingPolygon = this.selectedAreaChart.series.push(
+          am5map.MapPolygonSeries.new(this.selectedAreaRoot, {
+            fill: am5.color(0xffaaaa),
+          })
+        );
+      }
+
+      this.selectedPolygonSeries.mapPolygons.template.setAll({
+        tooltipText: "{name}",
+        toggleKey: "active",
+        interactive: true,
+      });
+
+      // Make stuff animate on load
+      this.selectedAreaChart.appear(1000, 100);
     }
   },
   mounted() {
@@ -171,11 +214,7 @@ export default {
         })
       );
 
-      this.boundingPolygon = chart.series.push(
-        am5map.MapPolygonSeries.new(root, {})
-      );
-
-      console.log(am5geodata_worldLow);
+      //console.log(am5geodata_worldLow);
 
       polygonSeries.mapPolygons.template.setAll({
         tooltipText: "{name}",
@@ -217,6 +256,16 @@ export default {
 
       // Make stuff animate on load
       chart.appear(1000, 100);
+
+      // Prepare selected area
+      this.selectedAreaRoot = am5.Root.new("selected-area");
+      this.selectedAreaChart = this.selectedAreaRoot.container.children.push(
+        am5map.MapChart.new(this.selectedAreaRoot, {
+          panX: "translateX",
+          panY: "translateY",
+          projection: am5map.geoMercator(),
+        })
+      );
     }); // end am5.ready()
   },
 };
@@ -224,8 +273,32 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
+#wrapper {
+  display: grid; 
+  grid-template-columns: 1fr 1fr 1fr; 
+  grid-template-rows: 500px auto; 
+  gap: 0px 0px; 
+  grid-template-areas: 
+    "chartdiv chartdiv selected-area"
+    "controls debug-info ."; 
+  height: 900px;
+  width: 100%;
+}
+
 #chartdiv {
   width: 100%;
   height: 500px;
+  grid-area: chartdiv;
 }
+#selected-area {
+  width: auto;
+  grid-area: selected-area;
+}
+#controls { 
+  grid-area: controls;
+}
+#debug-info {
+  grid-area: debug-info;
+}
+
 </style>
