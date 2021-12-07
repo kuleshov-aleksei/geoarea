@@ -5,6 +5,8 @@
       <div><el-button class="control-element" type="primary" @click="foundBoundingBox">Найти bounding-box</el-button></div>
       <div><el-input class="control-element" placeholder="Введите количество точек" v-model="targetPointsCount" clearable></el-input></div>
       <div><el-button class="control-element" type="primary" @click="generatePoints">Начать рассчет площади</el-button></div>
+      <div><el-button class="control-element" type="primary" @click="resetState">Сбросить состояние</el-button></div>
+      <div><el-button class="control-element" type="primary" @click="doSmth">Тестовая кнопка</el-button></div>
     </div>
     <div id="selected-area">
       <h1>Выбранная область: {{ longSelectedName }} ({{ shortSelectedId }})</h1>
@@ -50,18 +52,20 @@ export default {
       
       this.drawSelectedArea(this.shortSelectedId);
     },
+    doSmth: function () {
+      
+    },
     generatePoints: function () {
-      console.log('123');
+      let points = [];
+      this.pointSeries.show();
       for (let i = 0; i < this.targetPointsCount; i++) {
         let x = this.getRandomArbitrary(this.boundingbox_minX, this.boundingbox_maxX);
         let y = this.getRandomArbitrary(this.boundingbox_minY, this.boundingbox_maxY);
-        console.log("x = " + x + " y = " + y);
-
-        this.pointSeries.data.push({
-          geometry: { type: "Point", coordinates: [x, y] },
-          title: i
-        });
+        points.push({ long: x, lat: y});
       }
+      
+      this.pointSeries.data.setAll(points);
+      this.pointSeries.toFront();
     },
     foundBoundingBox: function () {
       this.resetState();
@@ -104,6 +108,7 @@ export default {
           ]
         }
       });
+      this.boundingPolygon.show();
 
       this.drawSelectedArea(this.shortSelectedId);
     },
@@ -168,12 +173,12 @@ export default {
       this.boundingbox_minY = Number.MAX_SAFE_INTEGER;
       this.boundingbox_maxX = Number.MIN_SAFE_INTEGER;
       this.boundingbox_maxY = Number.MIN_SAFE_INTEGER;
+      this.boundingPolygon.hide();
+      this.pointSeries.hide();
     },
     drawSelectedArea: function(region) {
-      //this.selectedAreaChart.series.clear();
       if (this.selectedPolygonSeries != null) {
         this.selectedAreaChart.series.removeIndex(this.selectedAreaChart.series.indexOf(this.selectedPolygonSeries));
-        //this.selectedAreaChart.series.removeIndex(this.selectedAreaChart.series.indexOf(this.boundingPolygon));
         this.selectedPolygonSeries.dispose();
       }
       this.selectedPolygonSeries = this.selectedAreaChart.series.push(
@@ -194,49 +199,28 @@ export default {
       if (this.pointSeries == null) {
         console.log("Creating point series");
         this.pointSeries = this.selectedAreaChart.series.push(
-          am5map.MapPointSeries.new(this.selectedAreaRoot, {})
+          am5map.MapPointSeries.new(this.selectedAreaRoot, {
+              latitudeField: "lat",
+              longitudeField: "long"
+          })
         );
 
-        //var colorset = am5.ColorSet.new(this.selectedAreaRoot, {});
-
         this.pointSeries.bullets.push(() => {
-          console.log("pushing bullet");
-          var container = am5.Container.new(this.selectedAreaRoot, {});
-          var circle = container.children.push(
-            am5.Circle.new(this.selectedAreaRoot, {
-              radius: 5,
-              tooltipY: 0,
-              //fill: colorset.next(),
-              fill: am5.color(0xff0000),
-              strokeOpacity: 0,
-              tooltipText: "{title}"
-            })
-          );
-
-          circle.animate({
-            key: "scale",
-            from: 1,
-            to: 5,
-            duration: 600,
-            easing: am5.ease.out(am5.ease.cubic),
-            loops: Infinity
-          });
-
           return am5.Bullet.new(this.selectedAreaRoot, {
-            sprite: container
+            sprite: am5.Circle.new(this.selectedAreaRoot, {
+              radius: 5,
+              fill: am5.color(0x00ff00)
+            })
           });
         });
       }
 
-      this.pointSeries.data.push({
-        geometry: { type: "Point", coordinates: [43.2666, -25.5631] },
-        title: "test3"
-      });
-
-      this.pointSeries.data.push({
-        geometry: { type: "Point", coordinates: [44.2666, -25.5631] },
-        title: "test2"
-      });
+      for (let i = 0; i < 1000; i++) {
+          this.pointSeries.data.push({
+          geometry: { type: "Point", coordinates: [0, 0] },
+          title: "prefill" + i
+        });
+      }
 
       this.selectedPolygonSeries.mapPolygons.template.setAll({
         tooltipText: "{name}",
