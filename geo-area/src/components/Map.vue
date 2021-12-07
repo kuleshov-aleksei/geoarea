@@ -61,7 +61,16 @@ export default {
       for (let i = 0; i < this.targetPointsCount; i++) {
         let x = this.getRandomArbitrary(this.boundingbox_minX, this.boundingbox_maxX);
         let y = this.getRandomArbitrary(this.boundingbox_minY, this.boundingbox_maxY);
-        points.push({ long: x, lat: y});
+
+        if (i < 1000)
+        {
+          points.push({ long: x, lat: y });
+        }
+      }
+
+      while (points.length < 1000)
+      {
+        points.push({ long: 0, lat: 0 });
       }
       
       this.pointSeries.data.setAll(points);
