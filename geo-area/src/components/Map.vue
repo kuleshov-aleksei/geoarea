@@ -2,7 +2,9 @@
   <div id="wrapper">
     <div id="chartdiv"></div>
     <div id="controls">
-      <el-button type="primary" @click="foundBoundingBox">Найти bounding-box</el-button>
+      <div><el-button class="control-element" type="primary" @click="foundBoundingBox">Найти bounding-box</el-button></div>
+      <div><el-input class="control-element" placeholder="Введите количество точек" v-model="targetPointsCount" clearable></el-input></div>
+      <div><el-button class="control-element" type="primary" @click="generatePoints">Начать рассчет площади</el-button></div>
     </div>
     <div id="selected-area">
       <h1>Выбранная область: {{ longSelectedName }} ({{ shortSelectedId }})</h1>
@@ -34,6 +36,7 @@ export default {
       boundingbox_minY: 0,
       boundingbox_maxX: 0,
       boundingbox_maxY: 0,
+      targetPointsCount: 100
       //boundingPolygon: null,
     };
   },
@@ -46,6 +49,19 @@ export default {
       this.geometryType = dataContext.geometryType;
       
       this.drawSelectedArea(this.shortSelectedId);
+    },
+    generatePoints: function () {
+      console.log('123');
+      for (let i = 0; i < this.targetPointsCount; i++) {
+        let x = this.getRandomArbitrary(this.boundingbox_minX, this.boundingbox_maxX);
+        let y = this.getRandomArbitrary(this.boundingbox_minY, this.boundingbox_maxY);
+        console.log("x = " + x + " y = " + y);
+
+        this.pointSeries.data.push({
+          geometry: { type: "Point", coordinates: [x, y] },
+          title: i
+        });
+      }
     },
     foundBoundingBox: function () {
       this.resetState();
@@ -175,6 +191,53 @@ export default {
         );
       }
 
+      if (this.pointSeries == null) {
+        console.log("Creating point series");
+        this.pointSeries = this.selectedAreaChart.series.push(
+          am5map.MapPointSeries.new(this.selectedAreaRoot, {})
+        );
+
+        //var colorset = am5.ColorSet.new(this.selectedAreaRoot, {});
+
+        this.pointSeries.bullets.push(() => {
+          console.log("pushing bullet");
+          var container = am5.Container.new(this.selectedAreaRoot, {});
+          var circle = container.children.push(
+            am5.Circle.new(this.selectedAreaRoot, {
+              radius: 5,
+              tooltipY: 0,
+              //fill: colorset.next(),
+              fill: am5.color(0xff0000),
+              strokeOpacity: 0,
+              tooltipText: "{title}"
+            })
+          );
+
+          circle.animate({
+            key: "scale",
+            from: 1,
+            to: 5,
+            duration: 600,
+            easing: am5.ease.out(am5.ease.cubic),
+            loops: Infinity
+          });
+
+          return am5.Bullet.new(this.selectedAreaRoot, {
+            sprite: container
+          });
+        });
+      }
+
+      this.pointSeries.data.push({
+        geometry: { type: "Point", coordinates: [43.2666, -25.5631] },
+        title: "test3"
+      });
+
+      this.pointSeries.data.push({
+        geometry: { type: "Point", coordinates: [44.2666, -25.5631] },
+        title: "test2"
+      });
+
       this.selectedPolygonSeries.mapPolygons.template.setAll({
         tooltipText: "{name}",
         toggleKey: "active",
@@ -183,6 +246,9 @@ export default {
 
       // Make stuff animate on load
       this.selectedAreaChart.appear(1000, 100);
+    },
+    getRandomArbitrary: function(min, max) {
+        return Math.random() * (max - min) + min;
     }
   },
   mounted() {
@@ -300,5 +366,8 @@ export default {
 #debug-info {
   grid-area: debug-info;
 }
-
+.control-element {
+  width: 300px;
+  margin: 4px;
+}
 </style>
