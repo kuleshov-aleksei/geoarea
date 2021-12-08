@@ -12,6 +12,7 @@
     "@amcharts/amcharts5-geodata": "^5.0.2",
     "core-js": "^3.6.5",
     "element-ui": "^2.15.6",
+    "geojson-geometries-lookup": "^0.5.0",
     "vue": "^2.6.11"
   },
   "devDependencies": {

@@ -16,6 +16,10 @@
         Границы: [{{ boundingbox_minX }} ; {{ boundingbox_minY }}] [{{ boundingbox_maxX }} ; {{ boundingbox_maxY }}] 
         <div id="selected-area"></div>
       </div>
+      <div class="basic-div-info">Точек в области: {{ calculated.pointsInsideArea }} (из {{ calculated.pointsGenerated }} сгенерированных)</div>
+      <div class="basic-div-info">Ширина области: {{ calculated.width.toFixed(2) }} км</div>
+      <div class="basic-div-info">Высота области: {{ calculated.height.toFixed(2) }} км</div>
+      <div class="basic-div-info">Площадь объекта: <b>{{ calculated.area.toFixed(2) }} км2</b></div>
     </div>
   </div>
 </template>
@@ -25,6 +29,8 @@ import * as am5 from "@amcharts/amcharts5";
 import * as am5map from "@amcharts/amcharts5/map";
 import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
 import am5geodata_worldLow from "@amcharts/amcharts5-geodata/worldLow";
+import * as GeoJsonGeometriesLookup from "geojson-geometries-lookup";
+
 
 export default {
   name: "Map",
@@ -38,8 +44,16 @@ export default {
       boundingbox_minY: 0,
       boundingbox_maxX: 0,
       boundingbox_maxY: 0,
-      targetPointsCount: 100
+      targetPointsCount: 100,
       //boundingPolygon: null,
+      calculated: {
+        pointsInsideArea: 0,
+        pointsGenerated: 0,
+        width: 0,
+        height: 0,
+        area: 0,
+        coef: 1.04
+      }
     };
   },
   methods: {
@@ -58,6 +72,9 @@ export default {
     generatePoints: function () {
       let points = [];
       this.pointSeries.show();
+      this.calculated.pointsInsideArea = 0;
+      this.calculated.pointsGenerated = 0;
+
       for (let i = 0; i < this.targetPointsCount; i++) {
         let x = this.getRandomArbitrary(this.boundingbox_minX, this.boundingbox_maxX);
         let y = this.getRandomArbitrary(this.boundingbox_minY, this.boundingbox_maxY);
@@ -66,6 +83,13 @@ export default {
         {
           points.push({ long: x, lat: y });
         }
+
+        if (this.isInsideArea(x, y))
+        {
+          this.calculated.pointsInsideArea++;
+        }
+
+        this.calculated.pointsGenerated++;
       }
 
       while (points.length < 1000)
@@ -75,6 +99,34 @@ export default {
       
       this.pointSeries.data.setAll(points);
       this.pointSeries.toFront();
+      this.calcArea();
+    },
+    calcArea: function() {
+      this.calculated.width = this.calcCrow(this.boundingbox_minX, this.boundingbox_minY, this.boundingbox_maxX, this.boundingbox_minY);
+      this.calculated.height = this.calcCrow(this.boundingbox_minX, this.boundingbox_minY, this.boundingbox_minX, this.boundingbox_maxY);
+      this.calculated.area = (this.calculated.pointsInsideArea / this.calculated.pointsGenerated) * this.calculated.width * this.calculated.height * this.calculated.coef;
+    },
+    calcCrow: function(lat1, lon1, lat2, lon2) {
+      var R = 6371; // km
+      var dLat = this.toRad(lat2-lat1);
+      var dLon = this.toRad(lon2-lon1);
+      lat1 = this.toRad(lat1);
+      lat2 = this.toRad(lat2);
+
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2); 
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+      var d = R * c;
+      return d;
+    },
+    toRad: function(Value) 
+    {
+      return Value * Math.PI / 180;
+    },
+    isInsideArea: function(x, y) {
+      const glookup = new GeoJsonGeometriesLookup(this.geoChunkArea);
+      const point1 = {type: "Point", coordinates: [x, y]}
+      return glookup.countContainers(point1) !== 0;
     },
     foundBoundingBox: function () {
       this.resetState();
@@ -197,6 +249,12 @@ export default {
         })
       );
 
+      var geoChunk = am5geodata_worldLow.features.filter(item => item.id === region);
+      this.geoChunkArea = {
+        type: "FeatureCollection",
+        features: geoChunk
+      };
+
       if (this.boundingPolygon == null) {
         this.boundingPolygon = this.selectedAreaChart.series.push(
           am5map.MapPolygonSeries.new(this.selectedAreaRoot, {
@@ -226,7 +284,8 @@ export default {
 
       for (let i = 0; i < 1000; i++) {
           this.pointSeries.data.push({
-          geometry: { type: "Point", coordinates: [0, 0] },
+          //geometry: { type: "Point", coordinates: [0, 0] },
+          geometry: { type: "Point", coordinates: [45.2666, -20.5631] },
           title: "prefill" + i
         });
       }
@@ -325,6 +384,7 @@ export default {
           projection: am5map.geoMercator(),
         })
       );
+
     }); // end am5.ready()
   },
 };
@@ -362,5 +422,8 @@ export default {
 .control-element {
   width: 300px;
   margin: 4px;
+}
+.basic-div-info {
+  padding: 5px;
 }
 </style>
