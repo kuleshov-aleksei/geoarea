@@ -6,10 +6,11 @@
       <div><el-input class="control-element" placeholder="Введите количество точек" v-model="targetPointsCount" clearable></el-input></div>
       <div><el-button class="control-element" type="primary" @click="generatePoints">Начать рассчет площади</el-button></div>
       <div><el-button class="control-element" type="primary" @click="resetState">Сбросить состояние</el-button></div>
-      <div><el-button class="control-element" type="primary" @click="doSmth">Тестовая кнопка</el-button></div>
+      <!--<div><el-button class="control-element" type="primary" @click="doSmth">Тестовая кнопка</el-button></div>-->
     </div>
     <div id="selected-area">
       <h1>Выбранная область: {{ longSelectedName }} ({{ shortSelectedId }})</h1>
+      <div v-if="targetPointsCount > 1000">В целях оптимизации, количество точек на рисунке ограничено 1000 точками. Остальные точки просчитываются в фоне</div>
     </div>
     <div id="debug-info">
       <div v-if="boundingbox_minX != 0">
@@ -70,36 +71,55 @@ export default {
       
     },
     generatePoints: function () {
-      let points = [];
+      this.points = [];
       this.pointSeries.show();
       this.calculated.pointsInsideArea = 0;
       this.calculated.pointsGenerated = 0;
 
-      for (let i = 0; i < this.targetPointsCount; i++) {
-        let x = this.getRandomArbitrary(this.boundingbox_minX, this.boundingbox_maxX);
-        let y = this.getRandomArbitrary(this.boundingbox_minY, this.boundingbox_maxY);
+      //for (let i = 0; i < this.targetPointsCount; i++) {
+      //  processIteration(i);
+      //}
 
-        if (i < 1000)
-        {
-          points.push({ long: x, lat: y });
-        }
+      this.index = 0;
+      
+      this.doChunk(this.targetPointsCount); 
 
-        if (this.isInsideArea(x, y))
-        {
-          this.calculated.pointsInsideArea++;
-        }
-
-        this.calculated.pointsGenerated++;
-      }
-
-      while (points.length < 1000)
+      while (this.points.length < 1000)
       {
-        points.push({ long: 0, lat: 0 });
+        this.points.push({ long: 0, lat: 0 });
       }
       
-      this.pointSeries.data.setAll(points);
+      this.pointSeries.data.setAll(this.points);
       this.pointSeries.toFront();
-      this.calcArea();
+    },
+    processIteration: function(index) {
+      let x = this.getRandomArbitrary(this.boundingbox_minX, this.boundingbox_maxX);
+      let y = this.getRandomArbitrary(this.boundingbox_minY, this.boundingbox_maxY);
+
+      if (index < 1000)
+      {
+        this.points.push({ long: x, lat: y });
+      }
+
+      if (this.isInsideArea(x, y))
+      {
+        this.calculated.pointsInsideArea++;
+      }
+
+      this.calculated.pointsGenerated++;
+    },
+    doChunk: function() {
+        var cnt = 10000;
+        while (cnt-- && this.index < this.targetPointsCount) {
+            this.processIteration(this.index);
+            ++this.index;
+        }
+        //if (this.index >= this.targetPointsCount) {
+          this.calcArea();
+        //}
+        if (this.index < this.targetPointsCount) {
+            setTimeout(this.doChunk, 1);
+        }
     },
     calcArea: function() {
       this.calculated.width = this.calcCrow(this.boundingbox_minX, this.boundingbox_minY, this.boundingbox_maxX, this.boundingbox_minY);
@@ -234,6 +254,11 @@ export default {
       this.boundingbox_minY = Number.MAX_SAFE_INTEGER;
       this.boundingbox_maxX = Number.MIN_SAFE_INTEGER;
       this.boundingbox_maxY = Number.MIN_SAFE_INTEGER;
+      this.calculated.pointsInsideArea = 0;
+      this.calculated.pointsGenerated = 0;
+      this.calculated.width = 0;
+      this.calculated.height = 0;
+      this.calculated.area = 0;
       this.boundingPolygon.hide();
       this.pointSeries.hide();
     },
